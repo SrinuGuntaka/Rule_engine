@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rule Engine with AST</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            padding: 10px;
+            margin-top: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4cae4c;
+        }
+        pre {
+            background-color: #eee;
+            padding: 10px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>Rule Engine with AST</h1>
+    <div class="container">
+        <button id="evaluateRule">Evaluate Rule</button>
+        <pre id="result"></pre>
+    </div>
+    <script>
+        class Node {
+            constructor(type, left = null, right = null, value = null) {
+                this.type = type;
+                this.left = left;
+                this.right = right;
+                this.value = value;
+            }
+        }
+
+        let combinedRule = null;
+
+        // Hardcoded rules
+        const rule1 = "((age > 30 AND department = 'Sales') OR (age < 25 AND department = 'Marketing')) AND (salary > 50000 OR experience > 5)";
+        const rule2 = "((age > 30 AND department = 'Marketing')) AND (salary > 20000 OR experience > 5)";
+
+        // Parse rule string and create AST
+        function createRule(ruleString) {
+            const tokens = ruleString.split(' ').filter(Boolean);
+            let root = null;
+
+            for (let i = 0; i < tokens.length; i++) {
+                if (tokens[i] === 'AND' || tokens[i] === 'OR') {
+                    const operatorNode = new Node('operator', root, null, tokens[i]);
+                    root = operatorNode;
+                } else {
+                    const conditionNode = new Node('operand', null, null, tokens[i]);
+                    if (!root) {
+                        root = conditionNode;
+                    } else if (root.type === 'operator' && !root.right) {
+                        root.right = conditionNode;
+                    }
+                }
+            }
+            return root;
+        }
+
+        // Combine multiple rules into one
+        function combineRules(ruleList) {
+            if (ruleList.length === 0) return null;
+            let combined = ruleList[0];
+            for (let i = 1; i < ruleList.length; i++) {
+                combined = new Node('operator', combined, ruleList[i], 'AND'); // Combine rules with 'AND'
+            }
+            return combined;
+        }
+
+        // Evaluate rule against data
+        function evaluateRule(node, data) {
+            if (!node) return false;
+            if (node.type === 'operand') {
+                const [key, operator, value] = node.value.split(/(<=|>=|<|>|==|!=)/);
+                switch (operator) {
+                    case '>': return data[key.trim()] > parseInt(value);
+                    case '<': return data[key.trim()] < parseInt(value);
+                    case '>=': return data[key.trim()] >= parseInt(value);
+                    case '<=': return data[key.trim()] <= parseInt(value);
+                    case '==': return data[key.trim()] === value.trim().replace(/['"]+/g, ''); // For strings like department
+                    case '!=': return data[key.trim()] !== value.trim().replace(/['"]+/g, '');
+                    default: return false;
+                }
+            } else if (node.type === 'operator') {
+                if (node.value === 'AND') {
+                    return evaluateRule(node.left, data) && evaluateRule(node.right, data);
+                } else if (node.value === 'OR') {
+                    return evaluateRule(node.left, data) || evaluateRule(node.right, data);
+                }
+            }
+        }
+
+        // Create and combine rules on page load
+        window.onload = function () {
+            const rules = [];
+            rules.push(createRule(rule1));
+            rules.push(createRule(rule2));
+            combinedRule = combineRules(rules);
+        };
+
+        // Test data and evaluate combined rule
+        document.getElementById('evaluateRule').addEventListener('click', () => {
+            const testData = {
+                age: 35,
+                department: 'Sales',
+                salary: 60000,
+                experience: 3
+            };
+            const result = evaluateRule(combinedRule, testData);
+            document.getElementById('result').textContent = `Evaluation Result: ${result ? "True" : "False"}
+Test Data:
+1. Age: ${testData.age}
+2. Department: ${testData.department}
+3. Salary: ${testData.salary}
+4. Experience: ${testData.experience}`;
+        });
+    </script>
+</body>
+</html>
